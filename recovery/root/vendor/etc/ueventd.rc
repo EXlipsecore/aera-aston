@@ -1,0 +1,43 @@
+firmware_directories /lib/firmware/ /vendor/firmware/ /etc/firmware/ /odm/firmware/tp/ /odm/firmware/ /odm/etc/wifi/ /mnt/vendor/persist/ /vendor/firmware/tp/ /vendor/firmware_mnt/image/ /firmware/image/
+subsystem dma_heap
+  devname uevent_devpath
+  dirname /dev/dma_heap
+subsystem mem_buf_vm
+  devname uevent_devpath
+  dirname /dev/mem_buf_vm
+/dev/dri/*                  0660    root    graphics
+/dev/graphics/*             0660    root    graphics
+/dev/kgsl                   0666    system  system
+/dev/kgsl-3d0               0666    system  system
+/dev/qti-smmu-proxy         0660    system  system
+/dev/input/*                0660    root    input
+/dev/ion                    0664    system  system
+/dev/membuf                 0664    system  system
+/dev/mem_buf_vm/*           0444    system  system
+/dev/dma_heap/*             0666    system  system
+/dev/0:0:0:49476            0600    system  system
+/dev/0:0:0:4                0600    system  root
+/dev/qseecom                0660    system  drmrpc
+/dev/qce                    0660    system  drmrpc
+/dev/smcinvoke              0660    system  drmrpc
+/dev/qsee_ipc_irq_spss      0660    system  drmrpc
+/dev/spcom                  0660    system  system
+/dev/spss_utils             0660    system  system
+/dev/sp_kernel              0660    system  system
+/dev/sp_nvm                 0660    system  system
+/dev/sp_ssr                 0660    system  system
+/dev/tee0                   0660    system  drmrpc
+/dev/teepriv0               0660    system  drmrpc
+/dev/ufs-bsg*               0660    system  system
+/dev/bsg/ufs-bsg*           0660    system  system
+/dev/bsg/0:0:0:49476        0600    system  system
+/dev/block/bootdevice/by-name/rpmb  0660  system  drmrpc
+/dev/block/sda              0660    root    system
+/dev/block/sdb              0660    root    system
+/dev/block/sdc              0660    root    system
+/dev/block/sdd              0660    root    system
+/dev/block/sde              0660    root    system
+/dev/block/sdf              0660    root    system
+/dev/wlan                   0660    wifi    wifi
+/sys/class/backlight/panel0-backlight brightness 0660 root system
+/sys/devices/platform/soc/1d84000.ufshc auto_hibern8 0660 system system

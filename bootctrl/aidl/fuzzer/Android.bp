@@ -1,0 +1,27 @@
+cc_fuzz {
+    name: "aidl_fuzzer_bootctrl",
+    defaults: ["libboot_control_qti_defaults"],
+    proprietary: true,
+
+    srcs: ["fuzzer.cpp"],
+
+    shared_libs: [
+        "liblog",
+        "libbase",
+        "libutils",
+        "libcutils",
+        "libbinder",
+        "libbinder_ndk",
+        "android.hardware.boot@1.1",
+        "android.hardware.boot-V1-ndk",
+    ],
+
+    static_libs: [
+        "libboot_control",
+        "libbinder_random_parcel",
+    ],
+
+    include_dirs: [
+        "hardware/qcom-caf/bootctrl/aidl",
+    ],
+}

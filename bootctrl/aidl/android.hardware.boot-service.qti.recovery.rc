@@ -1,0 +1,5 @@
+service vendor.boot-qti /system/bin/hw/android.hardware.boot-service.qti.recovery
+  class early_hal
+  user root
+  group root
+  seclabel u:r:recovery:s0

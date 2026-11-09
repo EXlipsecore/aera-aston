@@ -1,0 +1,58 @@
+//
+// Copyright (C) 2026 The Android Open Source Project
+// Copyright (C) 2026 AERA Recovery Project contributors
+//
+// SPDX-License-Identifier: Apache-2.0
+//
+
+soong_namespace {
+}
+
+prebuilt_root {
+    name: "aston_file_contexts.recovery",
+    src: ":file_contexts.concat.tmp",
+    filename: "file_contexts",
+    recovery: true,
+    install_in_root: true,
+}
+
+cc_library_static {
+    name: "libinit_aston",
+    recovery_available: true,
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+    ],
+    include_dirs: ["system/core/init"],
+    shared_libs: ["libbase"],
+    srcs: ["libinit/libinit_aston.cpp"],
+}
+
+// Stock SM8550 KeyMint HAL links against android.hardware.security.rkp-V3-ndk.so
+// while only referencing the V2 IRpcHardwareInfo / IRemotelyProvisionedComponent
+// symbols exported by this tree. Provide a V2-backed shim so KeyMint loads
+// without unresolved V3 symbols in recovery.
+cc_library_shared {
+    name: "libaston_rkp_v3_compat",
+    stem: "android.hardware.security.rkp-V3-ndk",
+    relative_install_path: "aston-compat",
+    whole_static_libs: ["android.hardware.security.rkp-V2-ndk"],
+    shared_libs: [
+        "libbinder_ndk",
+        "liblog",
+    ],
+}
+
+cc_library_shared {
+    name: "libaston_keymint_v2_compat",
+    stem: "android.hardware.security.keymint-V2-ndk",
+    relative_install_path: "aston-compat",
+    whole_static_libs: ["android.hardware.security.keymint-V2-ndk"],
+    shared_libs: [
+        "libaston_rkp_v3_compat",
+        "android.hardware.security.secureclock-V1-ndk",
+        "libbinder_ndk",
+        "liblog",
+    ],
+}

@@ -1,0 +1,19 @@
+# Charger
+ro.charger.enable_suspend=true
+
+# Gatekeeper
+vendor.gatekeeper.is_security_level_spu=0
+vendor.gatekeeper.disable_spu=true
+
+# FUSE passthrough
+persist.sys.fuse.passthrough.enable=true
+
+# Display
+vendor.display.enable_spr=1
+
+# Gralloc - SnapAlloc so Adreno EGL and KMS accept the same buffers
+vendor.gralloc.enable_snapalloc=true
+ro.hardware.egl=adreno
+
+# aston panel is 120 Hz, was inherited as 60
+ro.surface_flinger.game_default_frame_rate_override=120

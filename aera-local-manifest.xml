@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+    <remove-project name="android_vendor_recovery" />
+    <project path="vendor/recovery"
+             name="EXlipsecore/android_vendor_recovery"
+             remote="github"
+             revision="aera-16.0" />
+</manifest>

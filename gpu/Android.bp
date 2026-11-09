@@ -1,0 +1,22 @@
+// Copyright (C) 2026 AERA Recovery Project contributors
+// SPDX-License-Identifier: Apache-2.0
+
+// egl/gles symbols are resolved with dlopen at runtime, so this does not
+// link against libEGL or libGLESv2.
+cc_binary {
+    name: "aera-gpu-probe",
+    recovery: true,
+    srcs: ["egl_probe.cpp"],
+    header_libs: [
+        "libEGL_headers",
+        "libGLESv2_headers",
+    ],
+    shared_libs: ["libdl"],
+    stl: "none",
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Os",
+    ],
+}

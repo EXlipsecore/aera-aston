@@ -1,0 +1,165 @@
+#!/system/bin/sh
+# Copyright (C) 2026 AERA Recovery Project contributors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Mounts the installed stock audio stack read-only and starts the AGM backend.
+#
+# Nothing proprietary is shipped in this tree. The Qualcomm daemons and the
+# AGM/PAL libraries are read from the installed vendor partition, which this
+# script mounts read-only at /mnt/aera-stock.
+
+PATH=/system/bin:/sbin
+export PATH
+
+stock_root=/mnt/aera-stock
+vendor_root=${stock_root}/vendor
+system_root=${stock_root}/system
+audio_abi=/vendor/aera-audio-abi
+lock=${stock_root}/.audio-lock
+slot_suffix="$(getprop ro.boot.slot_suffix)"
+
+log()  { echo "AERA audio: $*"; }
+fail() { echo "AERA audio: $*" >&2; exit 1; }
+
+case "$(getprop ro.product.device)" in
+    aston|astonc|OP5D35L1|OP5CF9L1|CPH2585|CPH2609|CPH2609EEA|CPH2611|PJE110) ;;
+    *)
+        case "$(getprop ro.product.vendor.device)" in
+            aston|astonc|OP5D35L1|OP5CF9L1|CPH2585|CPH2609|CPH2609EEA|CPH2611|PJE110) ;;
+            *) fail "wrong device, this backend is aston only" ;;
+        esac
+        ;;
+esac
+
+mkdir -p "${stock_root}" "${vendor_root}" "${system_root}" /odm /firmware \
+    /vendor/firmware_mnt /vendor/dsp /vendor/etc/acdbdata \
+    /vendor/etc/audio "${audio_abi}" /vendor/etc/seccomp_policy 2>/dev/null
+
+lock_attempt=0
+while ! mkdir "${lock}" 2>/dev/null; do
+    [ "$(getprop init.svc.aera-agm-service)" = running ] && exit 0
+    lock_attempt=$((lock_attempt + 1))
+    [ "${lock_attempt}" -ge 300 ] && fail "another bootstrap did not finish"
+    sleep 0.1
+done
+trap 'rmdir "${lock}" 2>/dev/null' EXIT
+
+find_partition() {
+    part="$1"
+    for candidate in \
+        "/dev/block/mapper/${part}${slot_suffix}" \
+        "/dev/block/mapper/${part}_a" \
+        "/dev/block/mapper/${part}_b"; do
+        [ -b "${candidate}" ] && { echo "${candidate}"; return 0; }
+    done
+    return 1
+}
+
+mount_read_only() {
+    part="$1"; target="$2"
+    grep -q " ${target} " /proc/mounts && return 0
+    source=""
+    n=0
+    while [ -z "${source}" ] && [ "${n}" -lt 100 ]; do
+        source="$(find_partition "${part}")"
+        [ -n "${source}" ] && break
+        n=$((n + 1)); sleep 0.1
+    done
+    [ -n "${source}" ] || return 1
+    mount -t erofs -o ro "${source}" "${target}" 2>/dev/null || \
+        mount -t ext4 -o ro,noload "${source}" "${target}" 2>/dev/null
+}
+
+bind_ro() {
+    src="$1"; dst="$2"
+    [ -f "${src}" ] || return 1
+    [ -e "${dst}" ] || touch "${dst}" || return 1
+    grep -q " ${dst} " /proc/mounts && return 0
+    mount -o bind "${src}" "${dst}" || return 1
+    mount -o remount,bind,ro "${dst}" 2>/dev/null
+}
+
+start_svc() {
+    svc="$1"; required="$2"
+    [ "$(getprop "init.svc.${svc}")" = running ] && return 0
+    setprop ctl.start "${svc}"
+    n=0
+    while [ "$(getprop "init.svc.${svc}")" != running ] && [ "${n}" -lt 50 ]; do
+        n=$((n + 1)); sleep 0.1
+    done
+    [ "$(getprop "init.svc.${svc}")" = running ] && return 0
+    [ "${required}" = required ] && fail "service ${svc} did not start"
+    log "service ${svc} unavailable"
+    return 0
+}
+
+mount_read_only vendor "${vendor_root}" || fail "could not mount stock vendor"
+mount_read_only system "${system_root}" || fail "could not mount stock system"
+mount_read_only odm /odm               || fail "could not mount stock odm"
+
+# dsp partition carries the audiopd modules
+if ! grep -q ' /vendor/dsp ' /proc/mounts; then
+    dsp="/dev/block/bootdevice/by-name/dsp${slot_suffix}"
+    [ -b "${dsp}" ] || dsp="/dev/block/by-name/dsp${slot_suffix}"
+    [ -b "${dsp}" ] || fail "no dsp partition"
+    mount -t ext4 -o ro,noload "${dsp}" /vendor/dsp || fail "could not mount dsp"
+fi
+[ -e /dsp ] || ln -s /vendor/dsp /dsp 2>/dev/null
+
+# recovery's libbinder_ndk is not compatible with the vendor binder these
+# daemons were built against, so they restart-loop. bind just these two.
+system_lib64="${system_root}/system/lib64"
+[ -f "${system_lib64}/libbinder.so" ] || system_lib64="${system_root}/lib64"
+bind_ro "${system_lib64}/libbinder.so"     "${audio_abi}/libbinder.so"     || fail "bind libbinder"
+bind_ro "${system_lib64}/libbinder_ndk.so" "${audio_abi}/libbinder_ndk.so" || fail "bind libbinder_ndk"
+bind_ro "${vendor_root}/etc/seccomp_policy/vendor.qti.hardware.dsp.policy" \
+    "/vendor/etc/seccomp_policy/vendor.qti.hardware.dsp.policy"
+
+if ! grep -q ' /vendor/aera-stock-lib64 ' /proc/mounts; then
+    mount -o bind "${vendor_root}/lib64" /vendor/aera-stock-lib64 || \
+        fail "could not expose stock libs"
+    mount -o remount,bind,ro /vendor/aera-stock-lib64 2>/dev/null
+fi
+
+# adsp firmware
+if ! grep -q ' /firmware ' /proc/mounts; then
+    modem="/dev/block/bootdevice/by-name/modem${slot_suffix}"
+    [ -b "${modem}" ] || modem="/dev/block/by-name/modem${slot_suffix}"
+    [ -b "${modem}" ] || fail "no modem partition"
+    mount -t vfat -o ro "${modem}" /firmware || fail "could not mount firmware"
+fi
+if ! grep -q ' /vendor/firmware_mnt ' /proc/mounts; then
+    mount -o bind /firmware /vendor/firmware_mnt || fail "could not expose firmware"
+fi
+
+# calibration
+if [ -d "${vendor_root}/etc/acdbdata" ] && \
+   ! grep -q ' /vendor/etc/acdbdata ' /proc/mounts; then
+    mount -o bind "${vendor_root}/etc/acdbdata" /vendor/etc/acdbdata || \
+        fail "could not expose acdbdata"
+fi
+if [ -d "${vendor_root}/etc/audio" ] && \
+   ! grep -q ' /vendor/etc/audio ' /proc/mounts; then
+    mount -o bind "${vendor_root}/etc/audio" /vendor/etc/audio || \
+        fail "could not expose audio config"
+fi
+
+mkdir -p /data/vendor/audio/acdbdata/delta /data/vendor/audio_dsp 2>/dev/null
+
+# point the init services at the stock daemons
+/system/bin/aera-audio-relay || fail "daemon links failed"
+
+# order matters, audioadsprpcd creates audiopd and the apm endpoint which has
+# to be up before the machine driver probes
+start_svc aera-pd-mapper     required
+start_svc aera-dspservice    required
+start_svc aera-audioadsprpcd required
+
+n=0
+while [ ! -e /dev/snd/controlC0 ] && [ "${n}" -lt 200 ]; do
+    n=$((n + 1)); sleep 0.1
+done
+[ -e /dev/snd/controlC0 ] || fail "machine sound card did not register"
+
+start_svc aera-agm-service required
+log "aston AGM backend is ready"

@@ -1,0 +1,6 @@
+recovery_only(`
+type aston_firmware_file, fs_type, contextmount_type;
+allow aston_firmware_file vfat:filesystem associate;
+r_dir_file(kernel, aston_firmware_file)
+r_dir_file(recovery, aston_firmware_file)
+')

@@ -1,0 +1,21 @@
+// Copyright (C) 2026 AERA Recovery Project contributors
+// SPDX-License-Identifier: Apache-2.0
+
+// Hosts the stock AGM/PAL implementation from the installed vendor partition.
+// The proprietary libraries stay read-only under /mnt/aera-stock and are
+// dlopen'd at runtime, so nothing closed-source is built into this tree.
+cc_binary {
+    name: "aera-audio-service",
+    recovery: true,
+    srcs: ["aston_agm_service.c"],
+    shared_libs: [
+        "libbinder_ndk",
+        "libdl",
+        "liblog",
+    ],
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+    ],
+}

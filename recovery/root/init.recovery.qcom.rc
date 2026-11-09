@@ -1,0 +1,253 @@
+# Copyright (c) 2017-2023, The Linux Foundation. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause-Clear
+
+import /init.recovery.wifi.rc
+import /vendor/etc/init/init.recovery.aera-gpu.rc
+
+on early-init
+    export LD_LIBRARY_PATH /vendor/lib64:/vendor/lib64/egl:/vendor/lib64/hw:/system/lib64
+    mkdir /dev/cpuctl/background 0755 system system
+    mkdir /dev/blkio/background 0755 system system
+    mkdir /data/vendor 0771 root root
+    mkdir /data/vendor/gpu 0770 root root
+    write /sys/module/qcom_dload_mode/parameters/download_mode 0
+    write /sys/kernel/dload/dload_mode mini
+    write /sys/kernel/dload/emmc_dload 0
+    write /proc/oplus_init_watchdog/kick disable
+    write /proc/phoenix PHOENIX_BOOT_COMPLETED
+    write /proc/sys/kernel/panic_on_oops 0
+    write /proc/sys/kernel/panic 5
+    write /sys/module/firmware_class/parameters/path /lib/firmware
+    write /proc/sys/kernel/firmware_config/force_sysfs_fallback 1
+    start beforemodules
+
+on init
+    write /sys/module/qcom_dload_mode/parameters/download_mode 0
+    write /sys/kernel/dload/dload_mode mini
+    write /sys/kernel/dload/emmc_dload 0
+    write /proc/oplus_init_watchdog/kick disable
+    write /proc/phoenix PHOENIX_BOOT_COMPLETED
+    write /proc/sys/kernel/panic_on_oops 0
+    write /proc/sys/kernel/panic 5
+    write /sys/class/backlight/panel0-backlight/brightness 2048
+    chmod 0666 /dev/dma_heap/system
+    chmod 0666 /dev/dma_heap/qcom,system
+    setprop sys.usb.configfs 1
+    setprop keystore.module_hash.sent true
+    setprop vendor.gatekeeper.disable_spu true
+    setprop vendor.gatekeeper.is_security_level_spu 0
+    write /proc/sys/kernel/sched_lib_name "recovery,magiskboot,Updater,updater,update_engine_sideload"
+    write /proc/sys/kernel/sched_lib_mask_force 255
+    write /proc/sys/walt/sched_lib_name "recovery,magiskboot,Updater,updater,update_engine_sideload"
+    write /proc/sys/walt/sched_lib_mask_force 255
+    start servicemanager
+    start hwservicemanager
+    start vndservicemanager
+    start aera-graphics-allocator
+    start vendor.boot-qti
+
+on fs
+    write /sys/module/qcom_dload_mode/parameters/download_mode 0
+    write /sys/kernel/dload/dload_mode mini
+    write /sys/kernel/dload/emmc_dload 0
+    write /proc/oplus_init_watchdog/kick disable
+    write /proc/phoenix PHOENIX_BOOT_COMPLETED
+    write /proc/sys/kernel/panic_on_oops 0
+    write /proc/sys/kernel/panic 5
+    wait /dev/block/platform/soc/${ro.boot.bootdevice}
+    symlink /dev/block/platform/soc/${ro.boot.bootdevice} /dev/block/bootdevice
+    write /sys/module/firmware_class/parameters/path /lib/firmware
+    write /proc/sys/kernel/firmware_config/force_sysfs_fallback 1
+    mkdir /firmware 0771 system system
+    mount vfat /dev/block/bootdevice/by-name/modem${ro.boot.slot_suffix} /firmware ro shortname=lower,uid=0,gid=1000,dmask=227,fmask=337,context=u:object_r:aston_firmware_file:s0
+    mount vfat /dev/block/bootdevice/by-name/modem${ro.boot.slot_suffix} /firmware ro shortname=lower,uid=0,gid=1000,dmask=227,fmask=337
+    rm /vendor/firmware_mnt
+    symlink /firmware /vendor/firmware_mnt
+    mkdir /mnt/vendor/persist 0771 system system
+    mount ext4 /dev/block/bootdevice/by-name/persist /mnt/vendor/persist ro
+    symlink /mnt/vendor/persist /vendor/persist
+    install_keyring
+    start aston-qsee-up
+
+on post-fs-data
+    write /sys/module/qcom_dload_mode/parameters/download_mode 0
+    write /sys/kernel/dload/dload_mode mini
+    write /sys/kernel/dload/emmc_dload 0
+    write /proc/oplus_init_watchdog/kick disable
+    write /proc/phoenix PHOENIX_BOOT_COMPLETED
+    write /proc/sys/kernel/panic_on_oops 0
+    write /proc/sys/kernel/panic 5
+    mkdir /data/vendor 0771 root root
+    mkdir /data/vendor/gpu 0770 root root
+    mkdir /data/vendor/tzstorage 0770 system system
+    start aston-cpu-sensor
+
+on boot
+    write /sys/module/qcom_dload_mode/parameters/download_mode 0
+    write /sys/kernel/dload/dload_mode mini
+    write /sys/kernel/dload/emmc_dload 0
+    write /proc/oplus_init_watchdog/kick disable
+    write /proc/phoenix PHOENIX_BOOT_COMPLETED
+    write /proc/sys/kernel/panic_on_oops 0
+    write /proc/sys/kernel/panic 5
+    start snapuserd
+    start aston-cpu-sensor
+
+# AERA audio backend. Runs the stock AGM stack against the installed
+# partitions, mounted read-only by aston-audio-bootstrap.
+# LD_LIBRARY_PATH order matters, the abi shim dir has to come first.
+service aera-pd-mapper /vendor/bin/aera-pd-mapper
+    class core
+    disabled
+    # path is a symlink created by aston-audio-bootstrap
+    seclabel u:r:recovery:s0
+    user system
+    group system
+    setenv LD_LIBRARY_PATH /vendor/aera-audio-abi:/vendor/aera-stock-lib64:/vendor/lib64:/system/lib64
+
+service aera-dspservice /vendor/bin/aera-dspservice
+    class hal
+    disabled
+    seclabel u:r:recovery:s0
+    user system
+    group system wakelock oem_2908
+    capabilities BLOCK_SUSPEND
+    setenv LD_LIBRARY_PATH /vendor/aera-audio-abi:/vendor/aera-stock-lib64:/vendor/lib64:/system/lib64
+    interface aidl vendor.qti.hardware.dsp.IDspService/default
+
+service aera-audioadsprpcd /vendor/bin/aera-audioadsprpcd audiopd adsp
+    class main
+    disabled
+    seclabel u:r:recovery:s0
+    user media
+    group media
+    setenv LD_LIBRARY_PATH /vendor/aera-audio-abi:/vendor/aera-stock-lib64:/vendor/lib64:/system/lib64
+
+# agm runs as its own service, a child forked by the oneshot bootstrap
+# would get killed when the bootstrap exits
+service aera-agm-service /system/bin/aera-audio-service --aston-stock-agm
+    class main
+    disabled
+    seclabel u:r:recovery:s0
+    user root
+    group root system audio media wakelock
+    setenv LD_LIBRARY_PATH /vendor/aera-audio-abi:/vendor/aera-stock-lib64:/vendor/lib64:/system/lib64
+    setenv ANDROID_ROOT /system
+    setenv ANDROID_DATA /data
+    interface aidl vendor.qti.hardware.agm.IAGM/default
+    interface aidl vendor.qti.hardware.pal.IPAL/default
+
+service aera-audio-bootstrap /system/bin/aston-audio-bootstrap
+    class core
+    disabled
+    oneshot
+    seclabel u:r:recovery:s0
+    user root
+    group root system audio media wakelock
+
+# start audio after FBE so it does not race prepdecrypt/gatekeeper
+on property:post.decrypt.modules=true
+    start aera-audio-bootstrap
+
+on property:twrp.modules.loaded=true
+    mkdir /data/vendor 0771 root root
+    mkdir /data/vendor/gpu 0770 root root
+    chmod 0666 /dev/kgsl-3d0
+    chmod 0666 /dev/dma_heap/system
+    chmod 0666 /dev/dma_heap/qcom,system
+    start aera-graphics-allocator
+    start runatboot
+
+on property:fstab.additional=0
+    start aston-crypto-up
+
+on property:ro.crypto.state=encrypted
+    start aston-crypto-up
+
+on property:init.svc.fastbootd=running
+    start aera-graphics-allocator
+    stop vendor.keymint-qti
+    stop gatekeeper-1-0
+    stop qseecom-service
+    stop vendor.qseecomd
+    setprop crypto.ready 0
+    setprop aston.qsee.ready 0
+    rmdir /tmp/.aston_crypto_lock
+    umount /firmware
+    umount /mnt/vendor/persist
+
+service beforemodules /system/bin/beforemodules.sh
+    user root
+    group root
+    disabled
+    oneshot
+    seclabel u:r:recovery:s0
+
+service aston-cpu-sensor /system/bin/aston-cpu-sensor.sh
+    user root
+    group root
+    disabled
+    oneshot
+    seclabel u:r:recovery:s0
+
+service aston-qsee-up /system/bin/aston-qsee-up.sh
+    user root
+    group root
+    disabled
+    oneshot
+    seclabel u:r:recovery:s0
+
+service aston-crypto-up /system/bin/aston-crypto-up.sh
+    user root
+    group root
+    disabled
+    oneshot
+    seclabel u:r:recovery:s0
+
+service runatboot /system/bin/runatboot.sh
+    user root
+    group root
+    disabled
+    oneshot
+    seclabel u:r:recovery:s0
+
+service vibrator /vendor/bin/hw/vendor.qti.hardware.vibrator.service.oplus
+    class hal
+    user system
+    group system input
+    setenv LD_LIBRARY_PATH /vendor/lib64:/vendor/lib64/egl:/vendor/lib64/hw:/system/lib64
+    disabled
+    seclabel u:r:recovery:s0
+
+service vendor.qseecomd /vendor/bin/qseecomd
+    socket notify-topology stream 660 system drmrpc
+    class core
+    user root
+    group root drmrpc
+    setenv LD_LIBRARY_PATH /vendor/lib64:/vendor/lib64/egl:/vendor/lib64/hw:/system/lib64
+    disabled
+    seclabel u:r:recovery:s0
+
+service qseecom-service /vendor/bin/hw/vendor.qti.hardware.qseecom@1.0-service
+    class hal
+    user system
+    group system drmrpc
+    setenv LD_LIBRARY_PATH /vendor/lib64:/vendor/lib64/egl:/vendor/lib64/hw:/system/lib64
+    disabled
+    seclabel u:r:recovery:s0
+
+service vendor.keymint-qti /vendor/bin/hw/android.hardware.security.keymint-service-qti
+    class early_hal
+    user system
+    group system drmrpc
+    setenv LD_LIBRARY_PATH /vendor/lib64:/vendor/lib64/egl:/vendor/lib64/hw:/system/lib64
+    disabled
+    seclabel u:r:recovery:s0
+
+service gatekeeper-1-0 /vendor/bin/hw/android.hardware.gatekeeper@1.0-service-qti
+    class early_hal
+    user system
+    group system drmrpc
+    setenv LD_LIBRARY_PATH /vendor/lib64:/vendor/lib64/egl:/vendor/lib64/hw:/system/lib64
+    disabled
+    seclabel u:r:recovery:s0

@@ -1,0 +1,24 @@
+# Copyright (C) 2026 AERA Recovery Project contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+on early-init
+    export LD_LIBRARY_PATH /vendor/lib64:/vendor/lib64/egl:/vendor/lib64/hw:/system/lib64
+
+on post-fs-data
+    write /sys/module/qcom_dload_mode/parameters/download_mode 0
+    write /sys/kernel/dload/dload_mode mini
+    write /sys/kernel/dload/emmc_dload 0
+    write /proc/oplus_init_watchdog/kick disable
+    write /proc/phoenix PHOENIX_BOOT_COMPLETED
+    write /proc/sys/kernel/panic_on_oops 0
+    write /proc/sys/kernel/panic 5
+    mkdir /data/vendor 0771 root root
+    mkdir /data/vendor/gpu 0770 root root
+
+service aera-graphics-allocator /vendor/bin/hw/vendor.qti.hardware.display.allocator-service
+    class hal
+    user root
+    group root graphics system
+    capabilities SYS_NICE
+    setenv LD_LIBRARY_PATH /vendor/lib64:/vendor/lib64/egl:/vendor/lib64/hw:/system/lib64
+    seclabel u:r:recovery:s0

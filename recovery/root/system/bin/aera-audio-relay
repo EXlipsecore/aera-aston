@@ -1,0 +1,49 @@
+#!/system/bin/sh
+# Copyright (C) 2026 AERA Recovery Project contributors
+# SPDX-License-Identifier: Apache-2.0
+#
+# The three audio daemons do not need to be shipped. They are stock Qualcomm
+# binaries already present on the installed vendor partition, which the
+# bootstrap mounts read-only, so this just points the init services at them.
+#
+# Stock locations on aston:
+#   /vendor/bin/adsprpcd                                  -> audiopd relay
+#   /vendor/bin/pd-mapper                                 -> protection domain mapper
+#   /vendor/bin/hw/vendor.qti.hardware.dsp@1.0-service    -> dsp service
+#
+# aera-* names are kept so the init services stay readable.
+
+set -e
+
+stock=/mnt/aera-stock/vendor/bin
+slot="$(getprop ro.boot.slot_suffix)"
+
+wait_mount() {
+    n=0
+    while [ ! -d "$stock" ] && [ "$n" -lt 100 ]; do
+        n=$((n + 1)); sleep 0.1
+    done
+    [ -d "$stock" ] || { echo "AERA audio: stock vendor not mounted" >&2; exit 1; }
+}
+
+wait_mount
+
+for pair in \
+    "adsprpcd:aera-audioadsprpcd" \
+    "pd-mapper:aera-pd-mapper" \
+    "hw/vendor.qti.hardware.dsp@1.0-service:aera-dspservice"
+do
+    src="${stock}/${pair%%:*}"
+    dst="/vendor/bin/${pair##*:}"
+
+    if [ ! -x "$src" ]; then
+        echo "AERA audio: missing $src on slot${slot}" >&2
+        exit 1
+    fi
+
+    mkdir -p "$(dirname "$dst")"
+    [ -e "$dst" ] || ln -s "$src" "$dst" || exit 1
+done
+
+echo "AERA audio: daemon links ready"
+exit 0
