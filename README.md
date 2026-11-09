@@ -33,31 +33,3 @@ source build/envsetup.sh
 lunch twrp_aston-bp2a-eng
 mka adbd recoveryimage
 ```
-
-## Audio
-
-Kernel modules and the stock AGM/PAL stack are wired up. The plugin bridge
-is not ported yet, so there is no sound from plugins.
-
-```
-adb shell dmesg | grep -A4 "ALSA device list"
-adb shell logcat -s AERAAudio
-```
-
-`audio/README.md` has the full chain and the failure modes.
-
-## GPU
-
-```
-adb shell /system/bin/aera-gpu-probe
-```
-
-Prints the GL renderer. `Adreno (TM) 740` means the driver is fine and the
-slowdown is power or refresh config.
-
-## Bootloader
-
-This tree does not create, patch or inject super partitions. To lock the
-bootloader, flash complete stock firmware for your model first, boot once,
-then `fastboot flashing lock`. Locking over a partially flashed super needs
-EDL to recover.
